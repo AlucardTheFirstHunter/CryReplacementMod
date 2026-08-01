@@ -1,0 +1,9 @@
+{
+  "id": "CryReplacementMod",
+  "name": "CryReplacementMod",
+  "version": "1.0.0",
+  "entry": "main.lua",
+  "api": 2,
+  "category": "AUDIO",
+  "description": "Replaces all 151 Gen 1 Pokémon cries from the anime and Fire red and the original."
+}
