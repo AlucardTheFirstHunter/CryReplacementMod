@@ -4,6 +4,9 @@ return function(mod)
     -- assets/Anime/1.ogg … 151.ogg
     -- assets/FireRed/1.ogg … 151.ogg
     -- ORIGINAL = vanilla chip cries
+    --
+    -- Yellow Pikachu uses PCM clips (playPikaCry), not cries.PIKACHU.
+    -- This mod redirects those to assets/<pack>/25.ogg when a pack is on.
     ------------------------------------------------------------
 
     local CHOICES = {
@@ -12,10 +15,8 @@ return function(mod)
         { "FIRE RED", "FireRed" },
     }
 
-    -- Change if your files are .wav
-    local EXT = ".ogg"
+    local EXT = ".ogg" -- change to ".wav" if needed
 
-    -- National dex 1–151 → gen1recomp species ids
     local SPECIES = {
         "BULBASAUR", "IVYSAUR", "VENUSAUR",
         "CHARMANDER", "CHARMELEON", "CHARIZARD",
@@ -95,6 +96,9 @@ return function(mod)
         "MEW",
     }
 
+    local PIKACHU_DEX = 25
+    local currentPack = "Anime"
+
     ------------------------------------------------------------
     -- OPTION
     ------------------------------------------------------------
@@ -127,8 +131,76 @@ return function(mod)
         return CHOICES[i][2]
     end
 
+    local function getGame()
+        local ok, Game = pcall(require, "src.core.Game")
+        if ok and Game then return Game end
+        return nil
+    end
+
+    local function fileExists(path)
+        if love and love.filesystem and love.filesystem.getInfo then
+            local info = love.filesystem.getInfo(path)
+            if info and (info.type == "file" or not info.type) then
+                return true
+            end
+        end
+        local f = io.open(path, "rb")
+        if f then
+            f:close()
+            return true
+        end
+        return false
+    end
+
+    local function packCryPath(pack, dex)
+        if not pack or pack == "original" then return nil end
+        local path = mod.assets:path(
+            ("assets/%s/%d%s"):format(pack, dex, EXT)
+        )
+        if fileExists(path) then return path end
+        return nil
+    end
+
+    local function pikachuPackPath(pack)
+        return packCryPath(pack, PIKACHU_DEX)
+    end
+
+    local function invalidateSoundCache()
+        local Sound = require("src.core.Sound")
+        if Sound.invalidate then
+            Sound.invalidate()
+        end
+    end
+
     ------------------------------------------------------------
-    -- Snapshot vanilla cries once (for ORIGINAL restore)
+    -- Yellow Pikachu PCM → pack file (25.ogg)
+    ------------------------------------------------------------
+    do
+        local Sound = require("src.core.Sound")
+        local origPlayPika = Sound.playPikaCry
+
+        function Sound.playPikaCry(data, n)
+            local path = pikachuPackPath(currentPack)
+            if path and love.audio then
+                local ok, src = pcall(love.audio.newSource, path, "static")
+                if ok and src then
+                    -- Respect SFX / Pikachu volume when possible
+                    if Sound.getVolumeFor then
+                        pcall(function()
+                            src:setVolume(Sound.getVolumeFor("pikacry:" .. tostring(n or 1)))
+                        end)
+                    end
+                    src:stop()
+                    src:play()
+                    return src
+                end
+            end
+            return origPlayPika(data, n)
+        end
+    end
+
+    ------------------------------------------------------------
+    -- Vanilla snapshot + apply (missing file → keep vanilla)
     ------------------------------------------------------------
     local vanillaCries = nil
 
@@ -141,12 +213,6 @@ return function(mod)
         return out
     end
 
-    local function getGame()
-        local ok, Game = pcall(require, "src.core.Game")
-        if ok and Game then return Game end
-        return nil
-    end
-
     local function ensureVanillaSnapshot(data)
         if vanillaCries or not data or not data.audio or not data.audio.cries then
             return
@@ -154,43 +220,38 @@ return function(mod)
         vanillaCries = shallowCopy(data.audio.cries)
     end
 
-    ------------------------------------------------------------
-    -- Apply pack (runtime-safe: live data only)
-    ------------------------------------------------------------
     local function applyCries(pack)
+        currentPack = pack or "original"
+
         local Game = getGame()
         local data = Game and Game.data
         if not data or not data.audio or not data.audio.cries then
+            invalidateSoundCache()
             return
         end
 
         ensureVanillaSnapshot(data)
 
-        if pack == "original" then
-            if vanillaCries then
-                for species, def in pairs(vanillaCries) do
-                    data.audio.cries[species] = def
-                end
-            end
-        else
-            for dex, species in ipairs(SPECIES) do
-                data.audio.cries[species] = {
-                    file = mod.assets:path(
-                        ("assets/%s/%d%s"):format(pack, dex, EXT)
-                    ),
-                }
+        if vanillaCries then
+            for species, def in pairs(vanillaCries) do
+                data.audio.cries[species] = def
             end
         end
 
-        -- Drop cached cry sources so the next play uses the new defs
-        local Sound = require("src.core.Sound")
-        if Sound.invalidate then
-            Sound.invalidate()
+        if pack ~= "original" then
+            for dex, species in ipairs(SPECIES) do
+                local path = packCryPath(pack, dex)
+                if path then
+                    data.audio.cries[species] = { file = path }
+                end
+            end
         end
+
+        invalidateSoundCache()
     end
 
     ------------------------------------------------------------
-    -- Persist (same path as mod manager)
+    -- Persist
     ------------------------------------------------------------
     local function setCriesOption(game, value)
         if game and game.save and game.save.options then
@@ -206,18 +267,10 @@ return function(mod)
             loader.modOptions[mod.id] = loader.modOptions[mod.id] or {}
             loader.modOptions[mod.id].cries = value
         end
-
-        if loader and loader.events then
-            loader.events:emit("mod.options_changed", {
-                mod = mod.id,
-                key = "cries",
-                value = value,
-            })
-        end
     end
 
     ------------------------------------------------------------
-    -- Apply after game data exists
+    -- Boot
     ------------------------------------------------------------
     mod.events:on("game.ready", function()
         local Game = getGame()
@@ -228,10 +281,16 @@ return function(mod)
     end)
 
     ------------------------------------------------------------
-    -- Main Options menu
+    -- MAIN OPTIONS MENU
     ------------------------------------------------------------
     mod.hooks:wrap("ui.options.rows", function(next, game, rows)
         rows = next(game, rows) or rows
+
+        for _, r in ipairs(rows) do
+            if r.id == "mod_cries" then
+                return rows
+            end
+        end
 
         local row = {
             id = "mod_cries",
@@ -248,9 +307,18 @@ return function(mod)
             end,
         }
 
+        local inserted = false
         if mod.ui and mod.ui.insertAfter then
-            mod.ui.insertAfter(rows, "SFX VOL", row)
-        else
+            for _, anchor in ipairs({ "SFX VOL", "MUSIC VOL", "PIKACHU VOL" }) do
+                local n = #rows
+                mod.ui.insertAfter(rows, anchor, row)
+                if #rows > n then
+                    inserted = true
+                    break
+                end
+            end
+        end
+        if not inserted then
             rows[#rows + 1] = row
         end
 
@@ -258,7 +326,7 @@ return function(mod)
     end)
 
     ------------------------------------------------------------
-    -- Mod manager change
+    -- Mod manager
     ------------------------------------------------------------
     mod.events:on("mod.options_changed", function(ev)
         if ev.key ~= "cries" then return end
