@@ -2,7 +2,7 @@ This is a mod for the [Pokemon gen1 recomp](https://github.com/bryanthaboi/gen1r
 
 There are Three options available 
 - Original (unchanged Cries)
-- FireRed (GBA Remake)
+- Fire Red (GBA Remake)
 - Anime (Cries from the Anime TV show)
 
 The Anime files themselves were found on the [pokemmo forums](https://forums.pokemmo.com/index.php?/topic/86447-hq-pokemon-anime-cries-gen-1-5/) credits to Galladito/RojoY
