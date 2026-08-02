@@ -5,6 +5,10 @@ return function(mod)
     -- assets/FireRed/1.ogg … 151.ogg
     -- ORIGINAL = vanilla chip cries
     --
+    -- Pack files are staged into mod-derived/CryReplacementMod/ in the
+    -- LOVE save directory (see packCryPath below) so the engine can
+    -- resolve them through love.filesystem on every platform.
+    --
     -- Yellow Pikachu uses PCM clips (playPikaCry), not cries.PIKACHU.
     -- This mod redirects those to assets/<pack>/25.ogg when a pack is on.
     ------------------------------------------------------------
@@ -137,28 +141,35 @@ return function(mod)
         return nil
     end
 
-    local function fileExists(path)
-        if love and love.filesystem and love.filesystem.getInfo then
-            local info = love.filesystem.getInfo(path)
-            if info and (info.type == "file" or not info.type) then
-                return true
-            end
-        end
-        local f = io.open(path, "rb")
-        if f then
-            f:close()
-            return true
-        end
-        return false
-    end
+    -- Where the pack files are staged so the engine can play them.  The
+    -- mods tree is NOT guaranteed to sit on love.filesystem's read path
+    -- (a packaged / portable install keeps it outside the save dir, which
+    -- is why sources created straight from "mods/.../assets/..." paths
+    -- went silent on the Steam Deck): the OGG bytes are copied into the
+    -- mod-owned save-directory tree (save/mod-derived/<id>/..., the same
+    -- home the engine's asset transforms write), which is ALWAYS on
+    -- love.filesystem's read path.  The bytes come from mod:read, the
+    -- same channel the loader used to read main.lua, so they resolve on
+    -- every platform the mod itself loads on.
+    local GENERATED_ROOT = "mod-derived/CryReplacementMod"
 
+    -- Stage one pack file (assets/<pack>/<dex>.ogg) into the save dir;
+    -- returns the generated virtual path or nil when the file is missing
+    -- from the mod (the species then keeps its vanilla cry).
     local function packCryPath(pack, dex)
         if not pack or pack == "original" then return nil end
-        local path = mod.assets:path(
-            ("assets/%s/%d%s"):format(pack, dex, EXT)
-        )
-        if fileExists(path) then return path end
-        return nil
+        local rel = ("assets/%s/%d%s"):format(pack, dex, EXT)
+        local bytes = mod:read(rel)
+        if not bytes then return nil end
+        local outPath = ("%s/%s/%d%s"):format(GENERATED_ROOT, pack, dex, EXT)
+        if love and love.filesystem then
+            love.filesystem.createDirectory(GENERATED_ROOT)
+            love.filesystem.createDirectory(GENERATED_ROOT .. "/" .. pack)
+            if not love.filesystem.write(outPath, bytes) then
+                return nil
+            end
+        end
+        return outPath
     end
 
     local function pikachuPackPath(pack)
