@@ -1,9 +1,9 @@
 {
   "id": "CryReplacementMod",
   "name": "CryReplacementMod",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "entry": "main.lua",
   "api": 2,
   "category": "AUDIO",
-  "description": "Replaces all 151 Gen 1 Pokémon cries from the anime and Fire red and the original."
+  "description": "Replaces all 151 Gen 1 Pokemon cries from the anime and Fire Red and the original. 1.1.0: pack files are staged into the LOVE save directory so cries resolve on every platform (fixes silent cries on Steam Deck/Linux)."
 }
