@@ -1,4 +1,4 @@
-This is a mod for the [Pokemon gen1 recomp](https://github.com/bryanthaboi/gen1recomp) that replaces all 151 pokemon cries to be ones from the anime and from leaf green, they can be toggled on the fly in the options menu. 
+This is a mod for the [Pokemon gen1 recomp](https://github.com/bryanthaboi/gen1recomp) that replaces all 151 pokemon cries to be ones from the anime and from Fire Red/ leaf green, they can be toggled on the fly in the options menu. 
 
 There are Three options available 
 - Original (unchanged Cries)
