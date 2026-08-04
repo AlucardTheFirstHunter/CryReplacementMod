@@ -176,26 +176,107 @@ return function(mod)
     -- Yellow Pikachu PCM → pack file (25.ogg)
     ------------------------------------------------------------
     do
-        local Sound = require("src.core.Sound")
-        local origPlayPika = Sound.playPikaCry
+        local ok, Sound = pcall(require, "src.core.Sound")
+        if ok and Sound and Sound.playPikaCry then
+            local _orig = Sound.playPikaCry
+            local sources = {}
 
-        function Sound.playPikaCry(data, n)
-            local path = pikachuPackPath(currentPack)
-            if path and love.audio then
-                local ok, src = pcall(love.audio.newSource, path, "static")
-                if ok and src then
-                    -- Respect SFX / Pikachu volume when possible
-                    if Sound.getVolumeFor then
-                        pcall(function()
-                            src:setVolume(Sound.getVolumeFor("pikacry:" .. tostring(n or 1)))
-                        end)
-                    end
-                    src:stop()
-                    src:play()
-                    return src
+            -- Helper to check multiple potential paths for indexed cries (.ogg)
+            local function getSource(id)
+                if sources[id] then return sources[id] end
+
+                local candidatePaths = {}
+
+                -- 1. Check inside active pack directory (e.g. assets/Anime/25_2.ogg or assets/Anime/cries/25_2.ogg)
+                if currentPack and currentPack ~= "original" then
+                    table.insert(candidatePaths, mod.assets:path(("assets/%s/25_%d.ogg"):format(currentPack, id)))
+                    table.insert(candidatePaths, mod.assets:path(("assets/%s/cries/25_%d.ogg"):format(currentPack, id)))
                 end
+
+                -- 2. Check root mod directories (cries/25_2.ogg or assets/cries/25_2.ogg)
+                table.insert(candidatePaths, mod.assets:path(("cries/25_%d.ogg"):format(id)))
+                table.insert(candidatePaths, mod.assets:path(("assets/cries/25_%d.ogg"):format(id)))
+
+                for _, path in ipairs(candidatePaths) do
+                    if fileExists(path) then
+                        local ok, src = pcall(love.audio.newSource, path, "static")
+                        if ok and src then
+                            sources[id] = src
+                            return src
+                        end
+                    end
+                end
+
+                return nil
             end
-            return origPlayPika(data, n)
+
+            local function isYellowGame()
+                local ok, GameVersion = pcall(require, "src.core.GameVersion")
+                return ok and GameVersion and GameVersion.get() == "yellow"
+            end
+
+            function Sound.playPikaCry(data, n)
+                if love and love.audio then
+                    local src
+
+                    if isYellowGame() then
+                        ----------------------------------------------------
+                        -- YELLOW VERSION: Full indexed cry support (1..42)
+                        ----------------------------------------------------
+                        local id = n or 1
+
+                        -- Try finding the specific indexed sound (e.g. 25_2.ogg)
+                        src = getSource(id)
+
+                        -- Fallback for ID 1 (standard cry): try root cries/25.ogg, then pack 25.ogg
+                        if not src and id == 1 then
+                            local defaultPath = mod.assets:path("cries/25.ogg")
+                            if fileExists(defaultPath) then
+                                local ok, s = pcall(love.audio.newSource, defaultPath, "static")
+                                if ok and s then src = s end
+                            end
+                        end
+
+                        -- Safety fallback: If a specific variant N is missing, use main pack 25.ogg instead of GB cry
+                        if not src then
+                            local packPath = pikachuPackPath(currentPack)
+                            if packPath then
+                                local ok, s = pcall(love.audio.newSource, packPath, "static")
+                                if ok and s then src = s end
+                            end
+                        end
+                    else
+                        ----------------------------------------------------
+                        -- RED / BLUE: ONLY play 25.ogg (No variant cries)
+                        ----------------------------------------------------
+                        local packPath = pikachuPackPath(currentPack)
+                        if packPath then
+                            local ok, s = pcall(love.audio.newSource, packPath, "static")
+                            if ok and s then src = s end
+                        else
+                            local path = mod.assets:path("cries/25.ogg")
+                            if fileExists(path) then
+                                local ok, s = pcall(love.audio.newSource, path, "static")
+                                if ok and s then src = s end
+                            end
+                        end
+                    end
+
+                    -- Play audio with volume control
+                    if src then
+                        if Sound.getVolumeFor then
+                            pcall(function()
+                                src:setVolume(Sound.getVolumeFor("pikacry:" .. tostring(n or 1)))
+                            end)
+                        end
+                        src:stop()
+                        src:play()
+                        return src
+                    end
+                end
+
+                return _orig(data, n)
+            end
         end
     end
 
