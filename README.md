@@ -5,6 +5,6 @@ There are Three options available
 - Fire Red (GBA Remake)
 - Anime (Cries from the Anime TV show)
 
-The Anime files themselves were found on the [pokemmo forums](https://forums.pokemmo.com/index.php?/topic/86447-hq-pokemon-anime-cries-gen-1-5/) credits to Galladito/RojoY
+The Anime files themselves were sent to me on discord
 
 Video Preview Here https://youtu.be/Gb6nS47V0SE
