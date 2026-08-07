@@ -5,6 +5,6 @@ There are Three options available
 - Fire Red (GBA Remake)
 - Anime (Cries from the Anime TV show)
 
-The Anime files themselves were sent to me on discord
+The Anime files themselves were sent to me by vMarik on discord
 
 Video Preview Here https://youtu.be/Gb6nS47V0SE (outdated video but gives you an idea)
