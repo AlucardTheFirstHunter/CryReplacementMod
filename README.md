@@ -8,3 +8,5 @@ There are Three options available
 The Anime files themselves were sent to me by vMarik on discord
 
 Video Preview Here https://youtu.be/Gb6nS47V0SE (outdated video but gives you an idea)
+
+Coded using AI
